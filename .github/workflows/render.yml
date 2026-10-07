@@ -4,10 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag da release que receberá o MP4 (ex: reel-20261008)"
+        description: "Tag da release que receberá o MP4 (ex: reel-20261008-100123)"
         required: true
-      props:
-        description: "JSON com foto (URL), hook, steps e closing"
+      foto:
+        description: "URL pública da foto"
+        required: true
+      hook:
+        description: "Gancho (título)"
+        required: true
+      steps:
+        description: "Passos separados por | (2 a 4)"
+        required: true
+      closing:
+        description: "Frase do encerramento"
         required: true
 
 permissions:
@@ -28,12 +37,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libnss3 libdbus-1-3 libatk1.0-0 libasound2t64 libxrandr2 libxkbcommon-dev libxfixes3 libxcomposite1 libxdamage1 libgbm-dev libcups2 libatk-bridge2.0-0
       - run: npm ci
-      - name: Renderizar
+      - name: Montar props
         env:
-          PROPS: ${{ inputs.props }}
+          FOTO: ${{ inputs.foto }}
+          HOOK: ${{ inputs.hook }}
+          STEPS: ${{ inputs.steps }}
+          CLOSING: ${{ inputs.closing }}
         run: |
-          printf '%s' "$PROPS" > props.json
-          npx remotion render src/index.ts Dica out/reel.mp4 --props=props.json --log=error
+          jq -n --arg foto "$FOTO" --arg hook "$HOOK" --arg steps "$STEPS" --arg closing "$CLOSING" \
+            '{foto:$foto, hook:$hook, steps:($steps | split("|") | map(select(length > 0))), closing:$closing}' > props.json
+          cat props.json
+      - name: Renderizar
+        run: npx remotion render src/index.ts Dica out/reel.mp4 --props=props.json --log=error
       - name: Publicar MP4 na release
         env:
           GH_TOKEN: ${{ github.token }}
